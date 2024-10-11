@@ -1,0 +1,15 @@
+[package]
+name = "ssr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.28.1"
+crossterm = "*"
+tui-textarea = "*"
+ureq = {version = "3.0.0-rc1", features = ["json", "gzip", "brotli", "charset"]}
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.128"
+either = {version="1.13.0", features = ["serde"]}
+directories = "5.0.1"
+regex = "*"
