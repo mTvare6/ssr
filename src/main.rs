@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .column_spacing(1)
         .style(Style::new().blue())
         .header(
-            Row::new(vec!["Name", "Dept", "Roll"])
+            Row::new(vec!["Name", "Department", "Roll No."])
                 .style(Style::new().bold())
                 .bottom_margin(1),
         )
