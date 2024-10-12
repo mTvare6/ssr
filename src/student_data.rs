@@ -80,14 +80,15 @@ pub fn get_student_data_json() -> Result<ResponseBody, Box<dyn std::error::Error
             Ok(serde_json::from_str(&get_student_response()?)?)
         }
         else{
-            let json_file = format!("{}/main.json", project_dirs.data_local_dir().display());
-            if let Ok(mut file) = File::open(json_file.clone()){
+            let mut json_file = project_dirs.data_local_dir().to_path_buf();
+            json_file.push("main.json");
+            if let Ok(mut file) = File::open(&json_file){
                 let mut contents = String::new();
                 file.read_to_string(&mut contents)?;
                 Ok(serde_json::from_str(&contents)?)
             }
             else{
-                let mut file = File::create_new(json_file)?;
+                let mut file = File::create_new(&json_file)?;
                 let response_data = get_student_response()?;
                 let _ = file.write_all(response_data.as_bytes());
                 Ok(serde_json::from_str(&response_data)?)

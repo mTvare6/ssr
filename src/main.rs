@@ -8,9 +8,12 @@ use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Paragraph,Row,Table,TableState};
 use ratatui::Terminal;
+use ratatui_image::{picker::Picker, StatefulImage};
 use tui_textarea::{Input, Key, TextArea};
 use std::io;
+use std::path::PathBuf;
 use regex::Regex;
+use directories::ProjectDirs;
 mod student_data;
 use crate::student_data::{get_student_data_json};
 
@@ -24,9 +27,19 @@ fn activate(textarea: &mut TextArea<'_>) {
     textarea.set_block(textarea.block().unwrap().clone().style(Style::default().fg(Color::White)));
 }
 
-
-
-
+fn get_picture_dir() -> PathBuf{
+    if let Some(project_dirs) = ProjectDirs::from("me", "mtvare6", "ssr"){
+        if std::fs::create_dir_all(project_dirs.cache_dir()).is_err() {
+            std::env::temp_dir()
+        }
+        else{
+            project_dirs.cache_dir().to_path_buf()
+        }
+    }
+        else{
+            std::env::temp_dir()
+        }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdout = io::stdout();
@@ -35,10 +48,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut term = Terminal::new(backend)?;
+    let mut picker = Picker::from_termios().unwrap();
+    picker.guess_protocol();
+
     let students = get_student_data_json()?.documents;
     let mut show_list = students.clone();
-    let re_null = Regex::new("").unwrap();
 
+    let re_null = Regex::new("").unwrap();
     let mut re  = [
         Regex::new("").unwrap(),
         Regex::new("").unwrap(),
@@ -70,6 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
 
+    // Textarea
     let mut which = 0;
     for (i, mut textarea) in textarea.iter_mut().enumerate() {
         textarea.set_cursor_line_style(Style::default());
@@ -82,25 +99,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     activate(&mut textarea[0]);
 
-    let mut table_index = 0;
-    let mut table_len = show_list.len();
-    let mut table = show_list.clone().into_iter()
-        .map(|e| -> Row { vec![e.n, e.d, e.i].into_iter().collect() })
-        .collect::<Table>()
-        .widths([Constraint::Ratio(1, 3); 3])
-        .column_spacing(1)
-        .style(Style::new().blue())
-        .header(
-            Row::new(vec!["Name", "Department", "Roll No."])
-                .style(Style::new().bold())
-                .bottom_margin(1),
-        )
-        .block(Block::new().title(""))
-        .highlight_style(Style::new().reversed())
-        .highlight_symbol(">> ");
-    let mut table_state = TableState::default();
-    table_state.select(Some(table_index));
-
     macro_rules! switch_box {
         ($l:expr) => {
             if which!=7{
@@ -112,6 +110,65 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+
+    // Tables 
+    let mut table_index = 0;
+    let mut table_len = show_list.len();
+    let mut table = show_list.clone().into_iter()
+        .map(|e| Row::new(vec![e.n, e.d, e.i]))
+        .collect::<Table>()
+        .widths([Constraint::Ratio(1, 3); 3])
+        .column_spacing(1)
+        .style(Style::default().blue())
+        .header(
+            Row::new(vec!["Name", "Department", "Roll No."])
+                .style(Style::new().bold())
+                .bottom_margin(1),
+        )
+        .block(Block::default().borders(Borders::ALL))
+        .highlight_style(Style::new().reversed())
+        .highlight_symbol("> ");
+    let mut table_state = TableState::default();
+    table_state.select(Some(table_index));
+
+    // Pictures
+    let picture_home = get_picture_dir();
+
+    let get_pic_path = |roll:String| {
+        let mut pic_path = picture_home.clone();
+        pic_path.push(format!("{}.jpg", roll));
+        pic_path
+    };
+    macro_rules! get_pic_url {
+        ($l:expr) => {
+            format!("https://oa.cc.iitk.ac.in/Oa/Jsp/Photo/{}_0.jpg", $l)
+        }
+    }
+
+    let save_pic_from_roll = |roll:String| -> Result<(), ureq::Error> {
+        let pic_url =  get_pic_url!(roll);
+        let pic_path = get_pic_path(roll);
+        if !std::path::Path::exists(&pic_path) {
+            let get_resp = ureq::get(pic_url).call();
+            match get_resp{
+                Ok(res) => {
+                    let mut file = std::fs::File::create(pic_path)?;
+                    let mut reader = res.into_body().into_reader();
+                    std::io::copy(&mut reader, &mut file)?;
+                    return Ok(());
+                },
+                Err(e) => Err(e),
+            }
+        }
+        else{
+            Ok(())
+        }
+    };
+    save_pic_from_roll(show_list[0].clone().i)?;
+    let mut dyn_img = image::ImageReader::open(get_pic_path(show_list[0].clone().i))?.decode()?;
+    let mut image_prot = picker.new_resize_protocol(dyn_img);
+    let mut image_not_fail = true;
+
 
     loop {
 
@@ -168,8 +225,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             f.render_stateful_widget(&table, horz_layout_3[0], &mut table_state);
             if table_len!=0 {
+                let image = StatefulImage::new(None);
+                if image_not_fail {
+                    f.render_stateful_widget(image, vert_lagout_1[0], &mut image_prot);
+                }
                 f.render_widget(Paragraph::new(format!(
-                    "Name: {}\nRoll: {}\nProgramme: {}\nGender: {}\nHome: {}\nHall: {}\nBlood Group: {}\nRoom: {}\nMail: {}@iitk.ac.in",
+                    "Name: {}\nRoll: {}\nProgramme: {}\nGender: {}\nHome: {}\nHall: {}\nBlood Group: {}\nRoom: {}\nUsername: {}",
                     &show_list[table_index].n,
                     &show_list[table_index].i,
                     &show_list[table_index].p,
@@ -209,21 +270,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     table_len = show_list.len();
                     table_index = 0;
                     table = show_list.clone().into_iter()
-                        .map(|e| -> Row { vec![e.n, e.d, e.i].into_iter().collect() })
+                        .map(|e| Row::new(vec![e.n, e.d, e.i]))
                         .collect::<Table>()
                         .widths([Constraint::Ratio(1, 3); 3])
                         .column_spacing(1)
                         .style(Style::new().blue())
                         .header(
-                            Row::new(vec!["Name", "Dept", "Roll"])
+                            Row::new(vec!["Name", "Department", "Roll No."])
                                 .style(Style::new().bold())
                                 .bottom_margin(1),
                         )
-                        .block(Block::new().title(""))
+                        .block(Block::default().borders(Borders::ALL))
                         .highlight_style(Style::new().reversed())
-                        .highlight_symbol(">> ");
-                    table_state.select(Some(table_index));
-
+                        .highlight_symbol("> ");
                 }
                 else{
                     match input.key{
@@ -233,10 +292,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     table_state.select(Some(table_index));
                 }
+                if table_len!=0 {
+                    if save_pic_from_roll(show_list[table_index].clone().i).is_ok() {
+                        dyn_img = image::ImageReader::open(get_pic_path(show_list[table_index].clone().i))?.decode().unwrap_or_default();
+                        image_prot = picker.new_resize_protocol(dyn_img);
+                        image_not_fail = true;
+                    }
+                    else{
+                        image_not_fail = false;
+                    }
+                }
             }
         }
-
-
     }
 
     disable_raw_mode()?;
