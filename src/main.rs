@@ -136,7 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let get_pic_path = |roll:String| {
         let mut pic_path = picture_home.clone();
-        pic_path.push(format!("{}.jpg", roll));
+        pic_path.push(format!("{roll}.jpg"));
         pic_path
     };
     macro_rules! get_pic_url {
