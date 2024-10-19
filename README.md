@@ -5,15 +5,15 @@ Student Search TUI for IITK written in Rust.
 # Building
 
 ```sh
-$ git clone https://github.com/BurntSushi/ripgrep
-$ cd ripgrep
-$ cargo build --release
+$ git clone https://github.com/mTvare6/ssr.git
+$ cd ssr
+$ make
 ```
 
 # Installing
 
 ```sh
-$ cargo install --path .
+$ make install
 ```
 
 # Usage
@@ -23,5 +23,6 @@ $ ssr
 ```
 
 Use `C-h` `C-l` to navigate between input fields.
-Input fields support emacs shortcuts.
+Input fields support emacs shortcuts and regexes.
+Sixel, Kitty and iTerm protocol is supported. Alacritty and others which aren't compliant instead use a chafa-like renderer
 
