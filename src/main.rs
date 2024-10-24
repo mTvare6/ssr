@@ -8,14 +8,18 @@ use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, Paragraph,Row,Table,TableState};
 use ratatui::Terminal;
+
+#[cfg(not(target_os = "windows"))]
 use ratatui_image::{picker::Picker, StatefulImage};
 use tui_textarea::{Input, Key, TextArea};
 use std::io;
-use std::path::PathBuf;
 use regex::Regex;
-use directories::ProjectDirs;
 mod student_data;
-use crate::student_data::{get_student_data_json};
+use crate::student_data::get_student_data_json;
+
+#[cfg(unix)]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn inactivate(textarea: &mut TextArea<'_>){
     textarea.set_cursor_style(Style::default());
@@ -27,8 +31,9 @@ fn activate(textarea: &mut TextArea<'_>) {
     textarea.set_block(textarea.block().unwrap().clone().style(Style::default().fg(Color::White)));
 }
 
-fn get_picture_dir() -> PathBuf{
-    if let Some(project_dirs) = ProjectDirs::from("me", "mtvare6", "ssr"){
+#[cfg(not(target_os = "windows"))]
+fn get_picture_dir() -> std::path::PathBuf{
+    if let Some(project_dirs) = directories::ProjectDirs::from("me", "mtvare6", "ssr"){
         if std::fs::create_dir_all(project_dirs.cache_dir()).is_err() {
             std::env::temp_dir()
         }
@@ -48,8 +53,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut term = Terminal::new(backend)?;
-    let mut picker = Picker::from_termios().unwrap();
-    picker.guess_protocol();
+cfg_if::cfg_if! {
+    if #[cfg(not(target_os = "windows"))] {
+#[cfg(not(target_os = "windows"))]
+        #[cfg(not(target_os = "windows"))]
+        let mut picker = Picker::from_termios().unwrap();
+        picker.guess_protocol();
+    }
+}
 
     let students = get_student_data_json()?.documents;
     let mut show_list = students.clone();
@@ -131,6 +142,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut table_state = TableState::default();
     table_state.select(Some(table_index));
 
+
+
+cfg_if::cfg_if! {
+    if #[cfg(not(target_os = "windows"))] {
+
     // Pictures
     let picture_home = get_picture_dir();
 
@@ -168,6 +184,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut dyn_img = image::ImageReader::open(get_pic_path(show_list[0].clone().i))?.decode()?;
     let mut image_prot = picker.new_resize_protocol(dyn_img);
     let mut image_not_fail = true;
+    }
+}
 
 
     loop {
@@ -225,10 +243,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             f.render_stateful_widget(&table, horz_layout_3[0], &mut table_state);
             if table_len!=0 {
+ cfg_if::cfg_if! {
+    if #[cfg(not(target_os = "windows"))] {               
                 let image = StatefulImage::new(None);
                 if image_not_fail {
                     f.render_stateful_widget(image, vert_lagout_1[0], &mut image_prot);
                 }
+    }
+ }
                 f.render_widget(Paragraph::new(format!(
                     "Name: {}\nRoll: {}\nProgramme: {}\nGender: {}\nHome: {}\nHall: {}\nBlood Group: {}\nRoom: {}\nUsername: {}",
                     &show_list[table_index].n,
@@ -293,6 +315,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     table_state.select(Some(table_index));
                 }
                 if table_len!=0 {
+
+cfg_if::cfg_if! {
+    if #[cfg(not(target_os = "windows"))] {
                     if save_pic_from_roll(show_list[table_index].clone().i).is_ok() {
                         dyn_img = image::ImageReader::open(get_pic_path(show_list[table_index].clone().i))?.decode().unwrap_or_default();
                         image_prot = picker.new_resize_protocol(dyn_img);
@@ -301,6 +326,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     else{
                         image_not_fail = false;
                     }
+                }
+}
                 }
             }
         }
