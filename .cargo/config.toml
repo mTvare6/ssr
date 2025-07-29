@@ -1,0 +1,2 @@
+[env]
+MALLOC_CONF = "thp:always,metadata_thp:always"

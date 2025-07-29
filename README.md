@@ -7,13 +7,13 @@ Student Search TUI for IITK written in Rust.
 ```sh
 $ git clone https://github.com/mTvare6/ssr.git
 $ cd ssr
-$ make
+$ cargo build --release
 ```
 
 # Installing
 
 ```sh
-$ make install
+$ cargo install --path .
 ```
 
 # Usage

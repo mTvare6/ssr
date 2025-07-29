@@ -53,10 +53,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut term = Terminal::new(backend)?;
+
 cfg_if::cfg_if! {
     if #[cfg(not(target_os = "windows"))] {
-#[cfg(not(target_os = "windows"))]
-        #[cfg(not(target_os = "windows"))]
         let mut picker = Picker::from_termios().unwrap();
         picker.guess_protocol();
     }
