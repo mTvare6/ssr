@@ -2,18 +2,17 @@ use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use ratatui::prelude::Stylize;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::prelude::Stylize;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, Paragraph,Row,Table,TableState};
+use ratatui::widgets::{Block, Borders, Paragraph, Row, Table, TableState};
 use ratatui::Terminal;
 
 #[cfg(not(target_os = "windows"))]
-use ratatui_image::{picker::Picker, StatefulImage};
-use tui_textarea::{Input, Key, TextArea};
-use std::io;
 use regex::Regex;
+use std::io;
+use tui_textarea::{Input, Key, TextArea};
 mod student_data;
 use crate::student_data::get_student_data_json;
 
@@ -21,29 +20,39 @@ use crate::student_data::get_student_data_json;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn inactivate(textarea: &mut TextArea<'_>){
+fn inactivate(textarea: &mut TextArea<'_>) {
     textarea.set_cursor_style(Style::default());
-    textarea.set_block(textarea.block().unwrap().clone().style(Style::default().fg(Color::DarkGray)));
+    textarea.set_block(
+        textarea
+            .block()
+            .unwrap()
+            .clone()
+            .style(Style::default().fg(Color::DarkGray)),
+    );
 }
 
 fn activate(textarea: &mut TextArea<'_>) {
     textarea.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-    textarea.set_block(textarea.block().unwrap().clone().style(Style::default().fg(Color::White)));
+    textarea.set_block(
+        textarea
+            .block()
+            .unwrap()
+            .clone()
+            .style(Style::default().fg(Color::White)),
+    );
 }
 
 #[cfg(not(target_os = "windows"))]
-fn get_picture_dir() -> std::path::PathBuf{
-    if let Some(project_dirs) = directories::ProjectDirs::from("me", "mtvare6", "ssr"){
+fn get_picture_dir() -> std::path::PathBuf {
+    if let Some(project_dirs) = directories::ProjectDirs::from("me", "mtvare6", "ssr") {
         if std::fs::create_dir_all(project_dirs.cache_dir()).is_err() {
             std::env::temp_dir()
-        }
-        else{
+        } else {
             project_dirs.cache_dir().to_path_buf()
         }
+    } else {
+        std::env::temp_dir()
     }
-        else{
-            std::env::temp_dir()
-        }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,18 +63,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut term = Terminal::new(backend)?;
 
-cfg_if::cfg_if! {
-    if #[cfg(not(target_os = "windows"))] {
-        let mut picker = Picker::from_termios().unwrap();
-        picker.guess_protocol();
-    }
-}
-
     let students = get_student_data_json()?.documents;
     let mut show_list = students.clone();
 
     let re_null = Regex::new("").unwrap();
-    let mut re  = [
+    let mut re = [
         Regex::new("").unwrap(),
         Regex::new("").unwrap(),
         Regex::new("").unwrap(),
@@ -92,39 +94,36 @@ cfg_if::cfg_if! {
         "Department",
         "Hall",
         "Home",
-        "Gender"
+        "Gender",
     ];
-
 
     // Textarea
     let mut which = 0;
     for (i, mut textarea) in textarea.iter_mut().enumerate() {
         textarea.set_cursor_line_style(Style::default());
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(boxname[i])
-        );
+        textarea.set_block(Block::default().borders(Borders::ALL).title(boxname[i]));
         inactivate(&mut textarea);
     }
     activate(&mut textarea[0]);
 
     macro_rules! switch_box {
         ($l:expr) => {
-            if which!=7{
+            if which != 7 {
                 inactivate(&mut textarea[which]);
             }
             which = $l;
-            if which!=7{
+            if which != 7 {
                 activate(&mut textarea[which]);
             }
-        }
+        };
     }
 
-    // Tables 
+    // Tables
     let mut table_index = 0;
     let mut table_len = show_list.len();
-    let mut table = show_list.clone().into_iter()
+    let mut table = show_list
+        .clone()
+        .into_iter()
         .map(|e| Row::new(vec![e.n, e.d, e.i]))
         .collect::<Table>()
         .widths([Constraint::Ratio(1, 3); 3])
@@ -141,54 +140,7 @@ cfg_if::cfg_if! {
     let mut table_state = TableState::default();
     table_state.select(Some(table_index));
 
-
-
-cfg_if::cfg_if! {
-    if #[cfg(not(target_os = "windows"))] {
-
-    // Pictures
-    let picture_home = get_picture_dir();
-
-    let get_pic_path = |roll:String| {
-        let mut pic_path = picture_home.clone();
-        pic_path.push(format!("{roll}.jpg"));
-        pic_path
-    };
-    macro_rules! get_pic_url {
-        ($l:expr) => {
-            format!("https://oa.cc.iitk.ac.in/Oa/Jsp/Photo/{}_0.jpg", $l)
-        }
-    }
-
-    let save_pic_from_roll = |roll:String| -> Result<(), ureq::Error> {
-        let pic_url =  get_pic_url!(roll);
-        let pic_path = get_pic_path(roll);
-        if !std::path::Path::exists(&pic_path) {
-            let get_resp = ureq::get(pic_url).call();
-            match get_resp{
-                Ok(res) => {
-                    let mut file = std::fs::File::create(pic_path)?;
-                    let mut reader = res.into_body().into_reader();
-                    std::io::copy(&mut reader, &mut file)?;
-                    return Ok(());
-                },
-                Err(e) => Err(e),
-            }
-        }
-        else{
-            Ok(())
-        }
-    };
-    save_pic_from_roll(show_list[0].clone().i)?;
-    let mut dyn_img = image::ImageReader::open(get_pic_path(show_list[0].clone().i))?.decode()?;
-    let mut image_prot = picker.new_resize_protocol(dyn_img);
-    let mut image_not_fail = true;
-    }
-}
-
-
     loop {
-
         term.draw(|f| {
             let outer_layout = Layout::default()
                 .direction(Direction::Vertical)
@@ -242,14 +194,6 @@ cfg_if::cfg_if! {
 
             f.render_stateful_widget(&table, horz_layout_3[0], &mut table_state);
             if table_len!=0 {
- cfg_if::cfg_if! {
-    if #[cfg(not(target_os = "windows"))] {               
-                let image = StatefulImage::new(None);
-                if image_not_fail {
-                    f.render_stateful_widget(image, vert_lagout_1[0], &mut image_prot);
-                }
-    }
- }
                 f.render_widget(Paragraph::new(format!(
                     "Name: {}\nRoll: {}\nProgramme: {}\nGender: {}\nHome: {}\nHall: {}\nBlood Group: {}\nRoom: {}\nUsername: {}",
                     &show_list[table_index].n,
@@ -269,28 +213,47 @@ cfg_if::cfg_if! {
         match crossterm::event::read()?.into() {
             Input { key: Key::Esc, .. } => break,
             Input {
-                key: e @ (Key::Char('h')|Key::Char('l')),
+                key: e @ (Key::Char('h') | Key::Char('l')),
                 ctrl: true,
                 ..
             } => {
-                switch_box!((which +  match e{ Key::Char('h') => 7, Key::Char('l') => 1, _ => todo!()})  % 8);
+                switch_box!(
+                    (which
+                        + match e {
+                            Key::Char('h') => 7,
+                            Key::Char('l') => 1,
+                            _ => todo!(),
+                        })
+                        % 8
+                );
             }
             input => {
-                if which!=7{
+                if which != 7 {
                     textarea[which].input(input);
                     re[which] = Regex::new(&textarea[which].lines()[0]).unwrap_or(re_null.clone());
-                    show_list = students.clone().into_iter()
+                    show_list = students
+                        .clone()
+                        .into_iter()
                         .filter(|x| re[0].is_match(&x.n))
                         .filter(|x| re[1].is_match(&x.p))
                         .filter(|x| re[2].is_match(&x.i))
                         .filter(|x| re[3].is_match(&x.d))
                         .filter(|x| re[4].is_match(&x.h))
-                        .filter(|x| if let Some(a) = &x.a { re[5].is_match(&a) } else {false})
-                        .filter(|x| re[6].is_match(&x.g)).collect();
+                        .filter(|x| {
+                            if let Some(a) = &x.a {
+                                re[5].is_match(&a)
+                            } else {
+                                false
+                            }
+                        })
+                        .filter(|x| re[6].is_match(&x.g))
+                        .collect();
 
                     table_len = show_list.len();
                     table_index = 0;
-                    table = show_list.clone().into_iter()
+                    table = show_list
+                        .clone()
+                        .into_iter()
                         .map(|e| Row::new(vec![e.n, e.d, e.i]))
                         .collect::<Table>()
                         .widths([Constraint::Ratio(1, 3); 3])
@@ -304,30 +267,15 @@ cfg_if::cfg_if! {
                         .block(Block::default().borders(Borders::ALL))
                         .highlight_style(Style::new().reversed())
                         .highlight_symbol("> ");
-                }
-                else{
-                    match input.key{
-                        Key::Up => table_index=(table_index+table_len-1)%table_len,
-                        Key::Down => table_index=(table_index+1)%table_len,
-                        _ => {},
+                } else {
+                    match input.key {
+                        Key::Up => table_index = (table_index + table_len - 1) % table_len,
+                        Key::Down => table_index = (table_index + 1) % table_len,
+                        _ => {}
                     };
                     table_state.select(Some(table_index));
                 }
-                if table_len!=0 {
-
-cfg_if::cfg_if! {
-    if #[cfg(not(target_os = "windows"))] {
-                    if save_pic_from_roll(show_list[table_index].clone().i).is_ok() {
-                        dyn_img = image::ImageReader::open(get_pic_path(show_list[table_index].clone().i))?.decode().unwrap_or_default();
-                        image_prot = picker.new_resize_protocol(dyn_img);
-                        image_not_fail = true;
-                    }
-                    else{
-                        image_not_fail = false;
-                    }
-                }
-}
-                }
+                if table_len != 0 {}
             }
         }
     }
